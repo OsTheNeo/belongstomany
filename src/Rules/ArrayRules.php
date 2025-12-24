@@ -2,45 +2,51 @@
 
 namespace Ostheneo\Belongstomany\Rules;
 
-use Illuminate\Contracts\Validation\Rule;
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\Validator;
 
-class ArrayRules implements Rule
+class ArrayRules implements ValidationRule
 {
-    public $rules = [];
-    protected $message;
+    /**
+     * The validation rules to apply.
+     */
+    protected array $rules = [];
+
+    /**
+     * The validation error messages.
+     */
+    protected array $messages = [];
 
     /**
      * Create a new rule instance.
      */
     public function __construct(array $rules)
     {
-        array_push($rules, 'array');
-        $this->rules = $rules;
+        $this->rules = array_merge(['array'], $rules);
     }
 
     /**
-     * Determine if the validation rule passes.
+     * Run the validation rule.
      */
-    public function passes($attribute, $value): bool
+    public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        $input = [$attribute => json_decode($value, true)];
-        $this->rules = [$attribute => $this->rules];
-        $validator = Validator::make($input, $this->rules, $this->messages($attribute));
-        $this->message = $validator->errors()->get($attribute);
-        return $validator->passes();
-    }
+        $decodedValue = is_string($value) ? json_decode($value, true) : $value;
+        
+        if (json_last_error() !== JSON_ERROR_NONE && is_string($value)) {
+            $fail('The :attribute must be a valid JSON array.');
+            return;
+        }
 
-    /**
-     * Get the validation error message.
-     */
-    public function message()
-    {
-        return $this->message;
-    }
+        $input = [$attribute => $decodedValue];
+        $rules = [$attribute => $this->rules];
+        
+        $validator = Validator::make($input, $rules);
 
-    public function messages($attribute): array
-    {
-        return [];
+        if ($validator->fails()) {
+            foreach ($validator->errors()->get($attribute) as $message) {
+                $fail($message);
+            }
+        }
     }
 }
