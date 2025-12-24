@@ -6,6 +6,7 @@ use Illuminate\Validation\Rule;
 use Ostheneo\Belongstomany\Rules\ArrayRules;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\ResourceRelationshipGuesser;
+use Laravel\Nova\Fields\SupportsDependentFields;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 /**
@@ -15,6 +16,7 @@ use Laravel\Nova\Http\Requests\NovaRequest;
  */
 class Belongstomany extends Field
 {
+    use SupportsDependentFields;
     /**
      * The callback to be used for the field's options.
      */
@@ -134,13 +136,6 @@ class Belongstomany extends Field
         return $this->withMeta(['multiselectSlots' => $slots]);
     }
 
-    public function dependsOn($dependsOnField, $tableKey)
-    {
-        return $this->withMeta([
-            'dependsOn' => $dependsOnField,
-            'dependsOnKey' => $tableKey,
-        ]);
-    }
 
     public function rules($rules)
     {

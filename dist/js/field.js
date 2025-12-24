@@ -49,6 +49,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var laravel_nova__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! laravel-nova */ "laravel-nova");
 /* harmony import */ var laravel_nova__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(laravel_nova__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var vue_multiselect__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! vue-multiselect */ "./node_modules/vue-multiselect/dist/vue-multiselect.esm.js");
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t["return"] && (u = t["return"](), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
@@ -58,7 +62,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
 
 
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ({
-  mixins: [laravel_nova__WEBPACK_IMPORTED_MODULE_0__.FormField, laravel_nova__WEBPACK_IMPORTED_MODULE_0__.HandlesValidationErrors],
+  mixins: [laravel_nova__WEBPACK_IMPORTED_MODULE_0__.DependentFormField, laravel_nova__WEBPACK_IMPORTED_MODULE_0__.HandlesValidationErrors],
   props: ["resourceName", "resourceId", "field"],
   components: {
     VueMultiselect: vue_multiselect__WEBPACK_IMPORTED_MODULE_1__["default"]
@@ -74,7 +78,7 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
     };
   },
   mounted: function mounted() {
-    this.field.visible = true;
+    this.initializeComponent();
   },
   watch: {
     selectAll: function selectAll(value) {
@@ -83,37 +87,75 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
       } else {
         this.selectedValues = [];
       }
+    },
+    selectedValues: {
+      handler: function handler(newVal) {
+        // Emit change event for dependent fields
+        this.emitFieldValueChange(this.fieldAttribute, newVal);
+      },
+      deep: true
     }
   },
   methods: {
+    initializeComponent: function initializeComponent() {
+      this.optionsLabel = this.currentField.optionsLabel || "label";
+      this.trackBy = this.currentField.trackBy || "id";
+      this.fetchOptions();
+    },
     setInitialValue: function setInitialValue() {
-      this.optionsLabel = this.field.optionsLabel || "label";
-      this.trackBy = this.field.trackBy || "id";
-      if (this.field.value && Array.isArray(this.field.value)) {
-        this.selectedValues = this.field.value;
+      // Set initial selected values from field.value
+      if (this.currentField.value && Array.isArray(this.currentField.value)) {
+        this.selectedValues = this.currentField.value;
       } else {
         this.selectedValues = [];
       }
-      this.fetchOptions();
     },
     fetchOptions: function fetchOptions() {
       var _this = this;
-      if (this.field.options) {
-        this.options = this.field.options;
+      if (this.currentField.options) {
+        this.options = this.currentField.options;
         this.loading = false;
+        this.setInitialValue();
         return;
       }
       var baseUrl = "/nova-vendor/belongstomany/";
-      Nova.request().get(baseUrl + this.resourceName + "/options/" + this.field.attribute + "/" + this.optionsLabel).then(function (response) {
+      var endpoint = baseUrl + this.resourceName + "/options/" + this.currentField.attribute + "/" + this.optionsLabel;
+
+      // If there are dependent field values, append them
+      if (this.dependsOn && Object.keys(this.watchedFields).length > 0) {
+        var dependentValues = Object.entries(this.watchedFields).filter(function (_ref) {
+          var _ref2 = _slicedToArray(_ref, 2),
+            key = _ref2[0],
+            value = _ref2[1];
+          return value !== null && value !== undefined;
+        }).map(function (_ref3) {
+          var _ref4 = _slicedToArray(_ref3, 2),
+            key = _ref4[0],
+            value = _ref4[1];
+          return "".concat(key, "=").concat(encodeURIComponent(value));
+        }).join('&');
+        if (dependentValues) {
+          endpoint += '?' + dependentValues;
+        }
+      }
+      Nova.request().get(endpoint).then(function (response) {
         _this.options = response.data;
         _this.loading = false;
+        _this.setInitialValue();
       })["catch"](function (error) {
         console.error('Error fetching options:', error);
         _this.loading = false;
       });
     },
+    onSyncedField: function onSyncedField() {
+      // Called when the field is synced after a dependent field changes
+      this.fetchOptions();
+    },
     fill: function fill(formData) {
-      formData.append(this.field.attribute, JSON.stringify(this.selectedValues) || "[]");
+      this.fillIfVisible(formData, this.currentField.attribute, JSON.stringify(this.selectedValues) || "[]");
+    },
+    handleChange: function handleChange(value) {
+      this.selectedValues = value;
     }
   }
 });
@@ -240,6 +282,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var vue__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(vue__WEBPACK_IMPORTED_MODULE_0__);
 
 var _hoisted_1 = {
+  key: 0,
   "class": "belongs-to-many-field relative"
 };
 var _hoisted_2 = {
@@ -250,12 +293,13 @@ function render(_ctx, _cache, $props, $setup, $data, $options) {
   var _component_VueMultiselect = (0,vue__WEBPACK_IMPORTED_MODULE_0__.resolveComponent)("VueMultiselect");
   var _component_DefaultField = (0,vue__WEBPACK_IMPORTED_MODULE_0__.resolveComponent)("DefaultField");
   return (0,vue__WEBPACK_IMPORTED_MODULE_0__.openBlock)(), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createBlock)(_component_DefaultField, {
-    field: $props.field,
+    field: _ctx.currentField,
     errors: _ctx.errors,
-    "show-help-text": true
+    "show-help-text": true,
+    "full-width-content": _ctx.fullWidthContent
   }, {
     field: (0,vue__WEBPACK_IMPORTED_MODULE_0__.withCtx)(function () {
-      return [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("div", _hoisted_1, [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createVNode)(_component_VueMultiselect, {
+      return [_ctx.currentlyIsVisible ? ((0,vue__WEBPACK_IMPORTED_MODULE_0__.openBlock)(), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementBlock)("div", _hoisted_1, [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createVNode)(_component_VueMultiselect, {
         ref: "multiselect",
         modelValue: $data.selectedValues,
         "onUpdate:modelValue": _cache[0] || (_cache[0] = function ($event) {
@@ -267,33 +311,34 @@ function render(_ctx, _cache, $props, $setup, $data, $options) {
         "close-on-select": false,
         "clear-on-select": false,
         "preserve-search": true,
-        placeholder: $props.field.name,
+        placeholder: _ctx.currentField.name,
         label: $data.optionsLabel,
         "track-by": $data.trackBy,
         loading: $data.loading,
-        disabled: $props.field.readonly,
+        disabled: _ctx.currentlyIsReadonly,
         "max-height": 300,
-        "open-direction": "auto"
+        "open-direction": "auto",
+        onInput: $options.handleChange
       }, {
         noOptions: (0,vue__WEBPACK_IMPORTED_MODULE_0__.withCtx)(function () {
-          var _$props$field$multise;
-          return [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("span", null, (0,vue__WEBPACK_IMPORTED_MODULE_0__.toDisplayString)(((_$props$field$multise = $props.field.multiselectSlots) === null || _$props$field$multise === void 0 ? void 0 : _$props$field$multise.noOptions) || 'List is empty'), 1 /* TEXT */)];
+          var _ctx$currentField$mul;
+          return [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("span", null, (0,vue__WEBPACK_IMPORTED_MODULE_0__.toDisplayString)(((_ctx$currentField$mul = _ctx.currentField.multiselectSlots) === null || _ctx$currentField$mul === void 0 ? void 0 : _ctx$currentField$mul.noOptions) || 'List is empty'), 1 /* TEXT */)];
         }),
         noResult: (0,vue__WEBPACK_IMPORTED_MODULE_0__.withCtx)(function () {
-          var _$props$field$multise2;
-          return [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("span", null, (0,vue__WEBPACK_IMPORTED_MODULE_0__.toDisplayString)(((_$props$field$multise2 = $props.field.multiselectSlots) === null || _$props$field$multise2 === void 0 ? void 0 : _$props$field$multise2.noResult) || 'No elements found'), 1 /* TEXT */)];
+          var _ctx$currentField$mul2;
+          return [(0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("span", null, (0,vue__WEBPACK_IMPORTED_MODULE_0__.toDisplayString)(((_ctx$currentField$mul2 = _ctx.currentField.multiselectSlots) === null || _ctx$currentField$mul2 === void 0 ? void 0 : _ctx$currentField$mul2.noResult) || 'No elements found'), 1 /* TEXT */)];
         }),
         _: 1 /* STABLE */
-      }, 8 /* PROPS */, ["modelValue", "options", "placeholder", "label", "track-by", "loading", "disabled"]), $props.field.selectAll ? ((0,vue__WEBPACK_IMPORTED_MODULE_0__.openBlock)(), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementBlock)("label", _hoisted_2, [(0,vue__WEBPACK_IMPORTED_MODULE_0__.withDirectives)((0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("input", {
+      }, 8 /* PROPS */, ["modelValue", "options", "placeholder", "label", "track-by", "loading", "disabled", "onInput"]), _ctx.currentField.selectAll ? ((0,vue__WEBPACK_IMPORTED_MODULE_0__.openBlock)(), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementBlock)("label", _hoisted_2, [(0,vue__WEBPACK_IMPORTED_MODULE_0__.withDirectives)((0,vue__WEBPACK_IMPORTED_MODULE_0__.createElementVNode)("input", {
         type: "checkbox",
         "onUpdate:modelValue": _cache[1] || (_cache[1] = function ($event) {
           return $data.selectAll = $event;
         }),
         "class": "checkbox mr-2"
-      }, null, 512 /* NEED_PATCH */), [[vue__WEBPACK_IMPORTED_MODULE_0__.vModelCheckbox, $data.selectAll]]), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createTextVNode)(" " + (0,vue__WEBPACK_IMPORTED_MODULE_0__.toDisplayString)($props.field.messageSelectAll || 'Select All'), 1 /* TEXT */)])) : (0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)("v-if", true)])];
+      }, null, 512 /* NEED_PATCH */), [[vue__WEBPACK_IMPORTED_MODULE_0__.vModelCheckbox, $data.selectAll]]), (0,vue__WEBPACK_IMPORTED_MODULE_0__.createTextVNode)(" " + (0,vue__WEBPACK_IMPORTED_MODULE_0__.toDisplayString)(_ctx.currentField.messageSelectAll || 'Select All'), 1 /* TEXT */)])) : (0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)("v-if", true)])) : (0,vue__WEBPACK_IMPORTED_MODULE_0__.createCommentVNode)("v-if", true)];
     }),
     _: 1 /* STABLE */
-  }, 8 /* PROPS */, ["field", "errors"]);
+  }, 8 /* PROPS */, ["field", "errors", "full-width-content"]);
 }
 
 /***/ },
@@ -363,7 +408,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_0___default()(function(i){return i[1]});
 // Module
-___CSS_LOADER_EXPORT___.push([module.id, "\n/* Fix dropdown being cut off by parent overflow */\n.belongs-to-many-field {\n    position: relative;\n    z-index: 50;\n}\n.belongs-to-many-field .multiselect {\n    position: relative;\n    z-index: 50;\n}\n.belongs-to-many-field .multiselect--active {\n    z-index: 9999;\n}\n.belongs-to-many-field .multiselect__content-wrapper {\n    position: absolute;\n    z-index: 9999 !important;\n    width: 100%;\n    max-height: 300px;\n    overflow-y: auto;\n    background: #fff;\n    border: 1px solid rgba(var(--colors-gray-300), 1);\n    border-top: none;\n    border-radius: 0 0 0.5rem 0.5rem;\n    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);\n}\n.multiselect__placeholder {\n    font-size: 0.875rem;\n    color: rgba(var(--colors-gray-400), 1) !important;\n    padding-top: 2px;\n}\n.multiselect__tags {\n    border: 1px solid rgba(var(--colors-gray-300), 1);\n    border-radius: 0.5rem;\n    min-height: 36px;\n    padding: 6px 40px 0 8px;\n}\n.multiselect__tag {\n    background: rgba(var(--colors-primary-500), 1);\n    border-radius: 0.25rem;\n}\n.multiselect__tag-icon:after {\n    color: white;\n}\n.multiselect__tag-icon:hover {\n    background: rgba(var(--colors-primary-600), 1);\n}\n.multiselect__option--highlight {\n    background: rgba(var(--colors-primary-500), 1);\n}\n.multiselect__spinner {\n    background: #fff;\n    border-radius: 0.5rem;\n}\n\n/* Dark mode support */\n.dark .multiselect__content-wrapper {\n    background: rgba(var(--colors-gray-900), 1);\n    border-color: rgba(var(--colors-gray-700), 1);\n}\n.dark .multiselect__tags {\n    background: rgba(var(--colors-gray-900), 1);\n    border-color: rgba(var(--colors-gray-700), 1);\n}\n.dark .multiselect__input,\n.dark .multiselect__single {\n    background: transparent;\n    color: rgba(var(--colors-gray-300), 1);\n}\n.dark .multiselect__option {\n    background: rgba(var(--colors-gray-900), 1);\n    color: rgba(var(--colors-gray-300), 1);\n}\n.dark .multiselect__option--highlight {\n    background: rgba(var(--colors-primary-600), 1);\n    color: white;\n}\n", ""]);
+___CSS_LOADER_EXPORT___.push([module.id, "\n.belongs-to-many-field {\n    position: relative;\n    z-index: 50;\n}\n.belongs-to-many-field .multiselect--active {\n    z-index: 9999;\n}\n.belongs-to-many-field .multiselect__content-wrapper {\n    position: absolute;\n    z-index: 9999 !important;\n    width: 100%;\n    max-height: 300px;\n    overflow-y: auto;\n    background: #fff;\n    border: 1px solid #d1d5db;\n    border-top: none;\n    border-radius: 0 0 0.5rem 0.5rem;\n    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);\n}\n.multiselect__placeholder {\n    font-size: 0.875rem;\n    color: #9ca3af !important;\n    padding-top: 2px;\n}\n.multiselect__tags {\n    border: 1px solid #d1d5db;\n    border-radius: 0.5rem;\n    min-height: 36px;\n    padding: 6px 40px 0 8px;\n}\n.multiselect__tag {\n    background: #8b5cf6;\n    border-radius: 0.25rem;\n}\n.multiselect__tag-icon:after {\n    color: white;\n}\n.multiselect__tag-icon:hover {\n    background: #7c3aed;\n}\n.multiselect__option--highlight {\n    background: #8b5cf6;\n}\n.multiselect__spinner {\n    background: #fff;\n    border-radius: 0.5rem;\n}\n\n/* Dark mode */\n.dark .multiselect__tags {\n    background: #1f2937;\n    border-color: #374151;\n}\n.dark .multiselect__content-wrapper {\n    background: #1f2937;\n    border-color: #374151;\n}\n.dark .multiselect__option {\n    background: #1f2937;\n    color: #d1d5db;\n}\n.dark .multiselect__option--highlight {\n    background: #7c3aed;\n}\n.dark .multiselect__input,\n.dark .multiselect__single {\n    background: transparent;\n    color: #d1d5db;\n}\n.dark .multiselect__spinner {\n    background: #1f2937;\n}\n", ""]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
