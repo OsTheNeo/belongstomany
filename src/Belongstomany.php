@@ -8,6 +8,11 @@ use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\ResourceRelationshipGuesser;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
+/**
+ * BelongsToMany field for Laravel Nova.
+ *
+ * @method static static make(string $name, string|null $attribute = null, class-string|null $resource = null)
+ */
 class Belongstomany extends Field
 {
     /**
