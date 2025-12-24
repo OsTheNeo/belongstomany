@@ -31,6 +31,29 @@ class ResourceController
             $query = $query->where($dependsOnKey, $dependsOnValue);
         }
 
+        // Handle search query
+        $search = $request->get('search');
+        if ($search) {
+            $searchColumns = [$optionsLabel];
+
+            // Also search by 'name' if different from optionsLabel
+            if ($optionsLabel !== 'name' && in_array('name', $model->getFillable())) {
+                $searchColumns[] = 'name';
+            }
+
+            $query->where(function ($q) use ($search, $searchColumns) {
+                foreach ($searchColumns as $column) {
+                    $q->orWhere($column, 'LIKE', '%' . $search . '%');
+                }
+            });
+        }
+
+        // Apply limit for searchable fields
+        $limit = $request->get('limit', $field->optionsLimit ?? 1000);
+        if ($limit && $limit > 0) {
+            $query->limit($limit);
+        }
+
         return $query->get()
             ->map(function ($item) use ($optionsLabel) {
                 return [

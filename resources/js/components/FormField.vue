@@ -1,7 +1,7 @@
 <template>
-    <DefaultField 
-        :field="currentField" 
-        :errors="errors" 
+    <DefaultField
+        :field="currentField"
+        :errors="errors"
         :show-help-text="true"
         :full-width-content="fullWidthContent"
     >
@@ -22,17 +22,20 @@
                     :loading="loading"
                     :disabled="currentlyIsReadonly"
                     :max-height="300"
+                    :internal-search="!isServerSearchable"
                     open-direction="auto"
                     @input="handleChange"
+                    @search-change="handleSearchChange"
                 >
                     <template #noOptions>
-                        <span>{{ currentField.multiselectSlots?.noOptions || 'List is empty' }}</span>
+                        <span v-if="isServerSearchable && !searchQuery">Type to search...</span>
+                        <span v-else>{{ currentField.multiselectSlots?.noOptions || 'List is empty' }}</span>
                     </template>
                     <template #noResult>
                         <span>{{ currentField.multiselectSlots?.noResult || 'No elements found' }}</span>
                     </template>
                 </VueMultiselect>
-                <label v-if="currentField.selectAll" class="mt-2 flex items-center">
+                <label v-if="currentField.selectAll && !isServerSearchable" class="mt-2 flex items-center">
                     <input type="checkbox" v-model="selectAll" class="checkbox mr-2">
                     {{ currentField.messageSelectAll || 'Select All' }}
                 </label>
@@ -49,7 +52,7 @@ export default {
     mixins: [DependentFormField, HandlesValidationErrors],
     props: ["resourceName", "resourceId", "field"],
     components: { VueMultiselect },
-    
+
     data() {
         return {
             options: [],
@@ -58,13 +61,21 @@ export default {
             trackBy: "id",
             loading: true,
             selectAll: false,
+            searchQuery: '',
+            searchTimeout: null,
         };
     },
-    
+
+    computed: {
+        isServerSearchable() {
+            return this.currentField.searchable === true;
+        }
+    },
+
     mounted() {
         this.initializeComponent();
     },
-    
+
     watch: {
         selectAll(value) {
             if (value) {
@@ -73,25 +84,23 @@ export default {
                 this.selectedValues = [];
             }
         },
-        
+
         selectedValues: {
             handler(newVal) {
-                // Emit change event for dependent fields
                 this.emitFieldValueChange(this.fieldAttribute, newVal);
             },
             deep: true
         }
     },
-    
+
     methods: {
         initializeComponent() {
             this.optionsLabel = this.currentField.optionsLabel || "label";
             this.trackBy = this.currentField.trackBy || "id";
             this.fetchOptions();
         },
-        
+
         setInitialValue() {
-            // Set initial selected values from field.value
             if (this.currentField.value && Array.isArray(this.currentField.value)) {
                 this.selectedValues = this.currentField.value;
             } else {
@@ -99,51 +108,81 @@ export default {
             }
         },
 
-        fetchOptions() {
+        buildEndpoint(search = null) {
+            let baseUrl = "/nova-vendor/belongstomany/";
+            let endpoint = baseUrl + this.resourceName + "/options/" + this.currentField.attribute + "/" + this.optionsLabel;
+
+            const params = new URLSearchParams();
+
+            if (this.dependsOn && Object.keys(this.watchedFields).length > 0) {
+                Object.entries(this.watchedFields)
+                    .filter(([key, value]) => value !== null && value !== undefined)
+                    .forEach(([key, value]) => params.append(key, value));
+            }
+
+            if (search) {
+                params.append('search', search);
+            }
+
+            if (this.isServerSearchable) {
+                params.append('limit', this.currentField.optionsLimit || 1000);
+            }
+
+            const queryString = params.toString();
+            return queryString ? endpoint + '?' + queryString : endpoint;
+        },
+
+        fetchOptions(search = null) {
             if (this.currentField.options) {
                 this.options = this.currentField.options;
                 this.loading = false;
                 this.setInitialValue();
                 return;
             }
-            
-            let baseUrl = "/nova-vendor/belongstomany/";
-            let endpoint = baseUrl + this.resourceName + "/options/" + this.currentField.attribute + "/" + this.optionsLabel;
-            
-            // If there are dependent field values, append them
-            if (this.dependsOn && Object.keys(this.watchedFields).length > 0) {
-                const dependentValues = Object.entries(this.watchedFields)
-                    .filter(([key, value]) => value !== null && value !== undefined)
-                    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-                    .join('&');
-                    
-                if (dependentValues) {
-                    endpoint += '?' + dependentValues;
-                }
-            }
-            
+
+            this.loading = true;
+            const endpoint = this.buildEndpoint(search);
+
             Nova.request()
                 .get(endpoint)
                 .then((response) => {
                     this.options = response.data;
                     this.loading = false;
-                    this.setInitialValue();
+
+                    if (!search) {
+                        this.setInitialValue();
+                    }
                 })
                 .catch((error) => {
                     console.error('Error fetching options:', error);
                     this.loading = false;
                 });
         },
-        
+
+        handleSearchChange(query) {
+            this.searchQuery = query;
+
+            if (!this.isServerSearchable) {
+                return;
+            }
+
+            if (this.searchTimeout) {
+                clearTimeout(this.searchTimeout);
+            }
+
+            this.searchTimeout = setTimeout(() => {
+                this.fetchOptions(query);
+            }, 300);
+        },
+
         onSyncedField() {
-            // Called when the field is synced after a dependent field changes
             this.fetchOptions();
         },
 
         fill(formData) {
             this.fillIfVisible(formData, this.currentField.attribute, JSON.stringify(this.selectedValues) || "[]");
         },
-        
+
         handleChange(value) {
             this.selectedValues = value;
         },

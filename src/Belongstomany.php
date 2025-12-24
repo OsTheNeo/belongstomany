@@ -6,6 +6,7 @@ use Illuminate\Validation\Rule;
 use Ostheneo\Belongstomany\Rules\ArrayRules;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\ResourceRelationshipGuesser;
+use Laravel\Nova\Fields\Searchable;
 use Laravel\Nova\Fields\SupportsDependentFields;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
@@ -16,6 +17,7 @@ use Laravel\Nova\Http\Requests\NovaRequest;
  */
 class Belongstomany extends Field
 {
+    use Searchable;
     use SupportsDependentFields;
     /**
      * The callback to be used for the field's options.
@@ -27,6 +29,11 @@ class Belongstomany extends Field
     public $viewable = true;
     public $showAsList = false;
     public $pivotData = [];
+
+    /**
+     * The maximum number of results to load without search.
+     */
+    public $optionsLimit = 1000;
 
     /**
      * The field's component.
@@ -151,7 +158,7 @@ class Belongstomany extends Field
         if (!$this->isAction && $resource && method_exists($resource, $attribute)) {
             $related = $resource->{$attribute}()->get();
             $labelField = $this->label;
-            
+
             $this->value = $related->map(function ($item) use ($labelField) {
                 return [
                     'id' => $item->getKey(),
@@ -161,6 +168,15 @@ class Belongstomany extends Field
         } else {
             $this->value = [];
         }
+    }
+
+    /**
+     * Set the maximum number of options to load without search.
+     */
+    public function optionsLimit(int $limit)
+    {
+        $this->optionsLimit = $limit;
+        return $this;
     }
 
     public function jsonSerialize(): array
@@ -173,6 +189,8 @@ class Belongstomany extends Field
                 'resourceNameRelationship' => $this->resourceName,
                 'viewable' => $this->viewable,
                 'value' => $this->value ?? [],
+                'searchable' => $this->isSearchable(),
+                'optionsLimit' => $this->optionsLimit,
             ]
         );
     }
