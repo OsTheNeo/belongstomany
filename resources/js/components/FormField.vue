@@ -24,7 +24,6 @@
                     :max-height="300"
                     :internal-search="!isServerSearchable"
                     open-direction="auto"
-                    @input="handleChange"
                     @search-change="handleSearchChange"
                 >
                     <template #noOptions>
@@ -146,7 +145,17 @@ export default {
             Nova.request()
                 .get(endpoint)
                 .then((response) => {
-                    this.options = response.data;
+                    const searchResults = response.data;
+
+                    if (search && this.selectedValues.length > 0) {
+                        const selectedNotInResults = this.selectedValues.filter(
+                            selected => !searchResults.some(result => result[this.trackBy] === selected[this.trackBy])
+                        );
+                        this.options = [...selectedNotInResults, ...searchResults];
+                    } else {
+                        this.options = searchResults;
+                    }
+
                     this.loading = false;
 
                     if (!search) {
@@ -182,10 +191,6 @@ export default {
         fill(formData) {
             this.fillIfVisible(formData, this.currentField.attribute, JSON.stringify(this.selectedValues) || "[]");
         },
-
-        handleChange(value) {
-            this.selectedValues = value;
-        },
     },
 };
 </script>
@@ -207,28 +212,29 @@ export default {
     width: 100%;
     max-height: 300px;
     overflow-y: auto;
-    background: #fff;
-    border: 1px solid #d1d5db;
+    background: rgba(var(--colors-white), 1);
+    border: 1px solid rgba(var(--colors-gray-300), 1);
     border-top: none;
     border-radius: 0 0 0.5rem 0.5rem;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
 
 .multiselect__placeholder {
     font-size: 0.875rem;
-    color: #9ca3af !important;
+    color: rgba(var(--colors-gray-400), 1) !important;
     padding-top: 2px;
 }
 
 .multiselect__tags {
-    border: 1px solid #d1d5db;
+    border: 1px solid rgba(var(--colors-gray-300), 1);
     border-radius: 0.5rem;
     min-height: 36px;
     padding: 6px 40px 0 8px;
+    background: rgba(var(--colors-white), 1);
 }
 
 .multiselect__tag {
-    background: #8b5cf6;
+    background: rgba(var(--colors-primary-500), 1);
     border-radius: 0.25rem;
 }
 
@@ -237,45 +243,45 @@ export default {
 }
 
 .multiselect__tag-icon:hover {
-    background: #7c3aed;
+    background: rgba(var(--colors-primary-600), 1);
 }
 
 .multiselect__option--highlight {
-    background: #8b5cf6;
+    background: rgba(var(--colors-primary-500), 1);
 }
 
 .multiselect__spinner {
-    background: #fff;
+    background: rgba(var(--colors-white), 1);
     border-radius: 0.5rem;
 }
 
 /* Dark mode */
 .dark .multiselect__tags {
-    background: #1f2937;
-    border-color: #374151;
+    background: rgba(var(--colors-gray-900), 1);
+    border-color: rgba(var(--colors-gray-700), 1);
 }
 
 .dark .multiselect__content-wrapper {
-    background: #1f2937;
-    border-color: #374151;
+    background: rgba(var(--colors-gray-900), 1);
+    border-color: rgba(var(--colors-gray-700), 1);
 }
 
 .dark .multiselect__option {
-    background: #1f2937;
-    color: #d1d5db;
+    background: rgba(var(--colors-gray-900), 1);
+    color: rgba(var(--colors-gray-300), 1);
 }
 
 .dark .multiselect__option--highlight {
-    background: #7c3aed;
+    background: rgba(var(--colors-primary-600), 1);
 }
 
 .dark .multiselect__input,
 .dark .multiselect__single {
     background: transparent;
-    color: #d1d5db;
+    color: rgba(var(--colors-gray-300), 1);
 }
 
 .dark .multiselect__spinner {
-    background: #1f2937;
+    background: rgba(var(--colors-gray-900), 1);
 }
 </style>

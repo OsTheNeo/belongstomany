@@ -6,7 +6,6 @@ use Illuminate\Validation\Rule;
 use Ostheneo\Belongstomany\Rules\ArrayRules;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Fields\ResourceRelationshipGuesser;
-use Laravel\Nova\Fields\Searchable;
 use Laravel\Nova\Fields\SupportsDependentFields;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
@@ -17,8 +16,13 @@ use Laravel\Nova\Http\Requests\NovaRequest;
  */
 class Belongstomany extends Field
 {
-    use Searchable;
     use SupportsDependentFields;
+
+    /**
+     * Indicates if the field is searchable.
+     */
+    public $searchableField = false;
+
     /**
      * The callback to be used for the field's options.
      */
@@ -96,6 +100,15 @@ class Belongstomany extends Field
                 'noResult' => 'No elements found.',
             ],
         ]);
+    }
+
+    /**
+     * Enable server-side searching for this field.
+     */
+    public function searchable($searchable = true)
+    {
+        $this->searchableField = $searchable;
+        return $this;
     }
 
     public function optionsLabel(string $optionsLabel)
@@ -189,7 +202,7 @@ class Belongstomany extends Field
                 'resourceNameRelationship' => $this->resourceName,
                 'viewable' => $this->viewable,
                 'value' => $this->value ?? [],
-                'searchable' => $this->isSearchable(),
+                'searchable' => $this->searchableField,
                 'optionsLimit' => $this->optionsLimit,
             ]
         );
