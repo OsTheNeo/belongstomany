@@ -1,5 +1,6 @@
 {
     "name": "ostheneo/belongstomany",
+    "version": "1.0.0",
     "description": "A Laravel Nova field.",
     "keywords": [
         "laravel",
